@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { supabase, type SurveyResponse } from '@/lib/supabase'
-import Chart from 'chart.js/auto'
+
+const RadarChart = dynamic(() => import('@/components/RadarChart'), { ssr: false })
 
 const QUESTIONS = [
   { id: 'q1', text: '이번 도심 나들이와 생신 축하 자리는 평소 거주지(오지)에서 느꼈던 외로움이나 심리적 소외감을 해소하는 데 큰 도움이 되었다.' },
@@ -19,16 +21,10 @@ export default function SurveyPage() {
   const [responses, setResponses] = useState<SurveyResponse[]>([])
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
-  const chartRef = useRef<HTMLCanvasElement>(null)
-  const chartInstance = useRef<Chart | null>(null)
 
   useEffect(() => {
     fetchResponses()
   }, [])
-
-  useEffect(() => {
-    renderChart()
-  }, [responses])
 
   async function fetchResponses() {
     const { data } = await supabase
@@ -36,36 +32,6 @@ export default function SurveyPage() {
       .select('*')
       .order('submitted_at', { ascending: false })
     if (data) setResponses(data)
-  }
-
-  function renderChart() {
-    if (!chartRef.current) return
-    if (chartInstance.current) chartInstance.current.destroy()
-
-    const averages = QUESTIONS.map(q => {
-      if (responses.length === 0) return 0
-      const sum = responses.reduce((acc, r) => acc + ((r[q.id as keyof SurveyResponse] as number) || 0), 0)
-      return parseFloat((sum / responses.length).toFixed(1))
-    })
-
-    chartInstance.current = new Chart(chartRef.current, {
-      type: 'radar',
-      data: {
-        labels: ['Q1.소외감해소', 'Q2.자아존중감', 'Q3.일상동기', 'Q4.심적안도감'],
-        datasets: [{
-          label: '평균 점수',
-          data: averages,
-          backgroundColor: 'rgba(29, 78, 216, 0.2)',
-          borderColor: 'rgba(29, 78, 216, 1)',
-          borderWidth: 2,
-          pointBackgroundColor: 'rgba(29, 78, 216, 1)',
-        }],
-      },
-      options: {
-        responsive: true,
-        scales: { r: { min: 0, max: 5, ticks: { stepSize: 1 } } },
-      },
-    })
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -207,7 +173,7 @@ export default function SurveyPage() {
             </div>
             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 flex flex-col justify-center items-center">
               <h4 className="font-bold text-gray-700 mb-4 text-center">문항별 평균 점수 (5점 만점)</h4>
-              <canvas ref={chartRef} className="w-full max-w-xs" />
+              <RadarChart responses={responses} />
             </div>
           </div>
           <div className="mt-4 text-right">
